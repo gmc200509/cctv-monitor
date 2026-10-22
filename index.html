@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>動態自訂監控電視牆面板</title>
+    <style>
+        body {
+            font-family: "Microsoft JhengHei", Arial, sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #4da6ff;
+            margin-bottom: 5px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #888;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        /* 控制面板樣式 */
+        .control-panel {
+            background-color: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        .panel-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+        }
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-width: 150px;
+        }
+        .input-group.wide {
+            flex: 2;
+            min-width: 280px;
+        }
+        .input-group label {
+            font-size: 13px;
+            color: #aaa;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .input-group input {
+            background-color: #2a2a2a;
+            border: 1px solid #444;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .input-group input:focus {
+            border-color: #4da6ff;
+        }
+        .btn-submit {
+            background-color: #007acc;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            align-self: flex-end;
+            margin-top: 5px;
+            height: 38px;
+        }
+        .btn-submit:hover {
+            background-color: #0098ff;
+        }
+        /* 電視牆網格樣式 */
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 10px;
+        }
+        .cam-box {
+            background-color: #1a1a1a;
+            border: 2px solid #333;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: border-color 0.3s;
+        }
+        .cam-box:hover {
+            border-color: #555;
+        }
+        .cam-title {
+            font-size: 13px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #ccc;
+        }
+        .cam-title a {
+            color: #4da6ff;
+            text-decoration: none;
+            background: #252525;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            border: 1px solid #3c3c3c;
+        }
+        .cam-title a:hover {
+            background: #4da6ff;
+            color: #fff;
+        }
+        iframe {
+            width: 100%;
+            height: 190px;
+            border: none;
+            background-color: #000;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>動態自訂監控電視牆面板</h1>
+    <div class="subtitle">輸入參數並點擊「更新電視牆」，系統將自動重新渲染指定範圍的畫面</div>
+
+    <!-- 控制面版 -->
+    <div class="control-panel">
+        <div class="panel-row">
+            <div class="input-group wide">
+                <label for="baseUrl">1. 網頁基礎路徑 (Base URL)</label>
+                <input type="text" id="baseUrl" value="https://a3g3.qczycc.idv.tw">
+            </div>
+            <div class="input-group">
+                <label for="camPrefix">2. 攝影機名稱字頭</label>
+                <input type="text" id="camPrefix" value="cam">
+            </div>
+            <div class="input-group">
+                <label for="fileExt">3. 網頁副檔名</label>
+                <input type="text" id="fileExt" value=".html" placeholder="例如 .html 或 .php">
+            </div>
+            <div class="input-group" style="min-width: 90px;">
+                <label for="startNum">4. 起始編號</label>
+                <!-- 改為 text 型態並預設雙位數 "00"，輸入幾碼就自動補齊幾碼 -->
+                <input type="text" id="startNum" value="00" placeholder="例如 0 或 0000">
+            </div>
+            <div class="input-group" style="min-width: 90px;">
+                <label for="endNum">5. 結束編號</label>
+                <input type="number" id="endNum" value="30" min="0">
+            </div>
+            <button class="btn-submit" onclick="generateWall()">更新電視牆</button>
+        </div>
+    </div>
+
+    <!-- 電視牆容器 -->
+    <div class="grid-container" id="grid"></div>
+
+    <script>
+        function generateWall() {
+            const grid = document.getElementById('grid');
+            grid.innerHTML = ''; // 清空既有畫面
+
+            // 讀取輸入欄位數值
+            let baseUrl = document.getElementById('baseUrl').value.trim();
+            const camPrefix = document.getElementById('camPrefix').value.trim();
+            const fileExt = document.getElementById('fileExt').value.trim();
+            
+            // 抓取起始編號原始字串，以計算輸入了幾位數
+            const startStr = document.getElementById('startNum').value.trim();
+            const padLength = startStr.length > 0 ? startStr.length : 1;
+            
+            const startNum = parseInt(startStr, 10) || 0;
+            const endNum = parseInt(document.getElementById('endNum').value, 10) || 0;
+
+            // 自動校正 Base URL 的結尾斜線
+            if (baseUrl && !baseUrl.endsWith('/')) {
+                baseUrl += '/';
+            }
+
+            // 確保範圍邏輯正確
+            const min = Math.min(startNum, endNum);
+            const max = Math.max(startNum, endNum);
+
+            // 循環產生網格
+            for (let i = min; i <= max; i++) {
+                // 根據起始編號的字元長度動態補零對齊 (若超過設定長度則自動順延，不被截斷)
+                const camNum = String(i).padStart(padLength, '0');
+                const pageName = `${camPrefix}${camNum}${fileExt}`;
+                const fullUrl = baseUrl + pageName;
+
+                // 建立網格方塊
+                const box = document.createElement('div');
+                box.className = 'cam-box';
+
+                box.innerHTML = `
+                    <div class="cam-title">
+                        <span>📷 名稱：${camPrefix}${camNum}</span>
+                        <a href="${fullUrl}" target="_blank">新分頁放大</a>
+                    </div>
+                    <iframe src="${fullUrl}" loading="lazy"></iframe>
+                `;
+                
+                grid.appendChild(box);
+            }
+        }
+
+        // 網頁首次載入時，預設自動執行一次
+        window.onload = generateWall;
+    </script>
+</body>
+</html>
